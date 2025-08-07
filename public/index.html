@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Real-Time Tic Tac Toe</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>Tic Tac Toe</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Real-Time Tic Tac Toe</h1>
-  <div id="board"></div>
+  <h1>Tic Tac Toe</h1>
+  <div id="status">Waiting for another player...</div>
+  <div id="board" class="board"></div>
+  <div id="confirmContainer" style="display: none;">
+    <button id="confirmBtn">Play Again</button>
+  </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
