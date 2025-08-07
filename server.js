@@ -1,90 +1,86 @@
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const path = require('path');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = new Server(server);
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-let board = []; // active markers: { index, player, time }
-let cooldowns = {};
-let confirmations = {};
+const rooms = {};
 
 io.on('connection', socket => {
-  const player = socket.id;
-  cooldowns[player] = { placed: 0, until: 0 };
-  confirmations[player] = false;
+  console.log('A user connected');
 
-  socket.emit('connected', player);
-
-  socket.on('placeMarker', idx => {
-    const now = Date.now();
-    const cd = cooldowns[player];
-    if (now < cd.until || cd.placed >= 2) return;
-
-    board.push({ index: idx, player, time: now });
-    cd.placed++;
-    if (cd.placed === 2) cd.until = now + 1000;
-
-    io.emit('boardUpdate', board);
-
-    checkWinCondition();
+  socket.on('createRoom', roomId => {
+    if (!rooms[roomId]) {
+      rooms[roomId] = { players: [], board: Array(9).fill(null), turn: 'X' };
+    }
+    if (rooms[roomId].players.length < 2) {
+      rooms[roomId].players.push(socket.id);
+      socket.join(roomId);
+      socket.emit('roomJoined', roomId);
+      io.to(roomId).emit('updatePlayers', rooms[roomId].players.length);
+    }
   });
 
-  socket.on('restartConfirm', () => {
-    confirmations[player] = true;
-    if (Object.values(confirmations).every(v => v)) startNewGame();
+  socket.on('joinRoom', roomId => {
+    if (rooms[roomId] && rooms[roomId].players.length < 2) {
+      rooms[roomId].players.push(socket.id);
+      socket.join(roomId);
+      socket.emit('roomJoined', roomId);
+      io.to(roomId).emit('updatePlayers', rooms[roomId].players.length);
+    } else {
+      socket.emit('roomFull');
+    }
+  });
+
+  socket.on('makeMove', ({ roomId, index }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const symbol = room.players[0] === socket.id ? 'X' : 'O';
+    if (room.turn !== symbol) return;
+
+    if (!room.board[index]) {
+      room.board[index] = symbol;
+      room.turn = symbol === 'X' ? 'O' : 'X';
+      io.to(roomId).emit('moveMade', { board: room.board, turn: room.turn });
+
+      const winner = checkWinner(room.board);
+      if (winner) {
+        io.to(roomId).emit('gameOver', { winner });
+        delete rooms[roomId];
+      }
+    }
   });
 
   socket.on('disconnect', () => {
-    delete cooldowns[player];
-    delete confirmations[player];
+    console.log('A user disconnected');
+    for (const [roomId, room] of Object.entries(rooms)) {
+      room.players = room.players.filter(p => p !== socket.id);
+      if (room.players.length === 0) {
+        delete rooms[roomId];
+      }
+    }
   });
 });
 
-setInterval(() => {
-  const now = Date.now();
-  board = board.filter(m => now - m.time < 2000);
-  io.emit('boardUpdate', board);
-
-  // Reset placed count if cooldown expired
-  Object.entries(cooldowns).forEach(([p, cd]) => {
-    if (now >= cd.until) cd.placed = 0;
-  });
-}, 100);
-
-function checkWinCondition() {
-  const playersLatest = {};
-  board.forEach(m => {
-    playersLatest[m.player] = playersLatest[m.player] || [];
-    playersLatest[m.player].push(m.index);
-  });
-
-  Object.entries(playersLatest).forEach(([p, positions]) => {
-    if (hasThreeInARow(positions)) {
-      io.emit('gameOver', p);
+function checkWinner(board) {
+  const wins = [
+    [0,1,2],[3,4,5],[6,7,8], // rows
+    [0,3,6],[1,4,7],[2,5,8], // cols
+    [0,4,8],[2,4,6]          // diags
+  ];
+  for (const [a,b,c] of wins) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return board[a];
     }
-  });
-}
-
-const combos = [
-  [0,1,2], [3,4,5], [6,7,8],
-  [0,3,6], [1,4,7], [2,5,8],
-  [0,4,8], [2,4,6],
-];
-
-function hasThreeInARow(pos) {
-  return combos.some(c => c.every(i => pos.includes(i)));
-}
-
-function startNewGame() {
-  board = [];
-  Object.keys(confirmations).forEach(p => confirmations[p] = false);
-  io.emit('boardUpdate', board);
-  io.emit('newGame');
+  }
+  return null;
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
