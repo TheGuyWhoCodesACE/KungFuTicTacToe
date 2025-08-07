@@ -1,11 +1,13 @@
 {
-  "name": "real-time-tic-tac-toe",
+  "name": "kungfu-tictactoe",
   "version": "1.0.0",
+  "description": "Multiplayer Tic-Tac-Toe game with rooms",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "ejs": "^3.1.9",
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
   }
