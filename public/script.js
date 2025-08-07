@@ -1,50 +1,51 @@
 const socket = io();
-const boardEl = document.getElementById('board');
-const status = document.getElementById('status');
-const confirmOverlay = document.getElementById('confirm');
-const playBtn = document.getElementById('playAgain');
+let currentRoom = null;
+let mySymbol = "X";
+let isMyTurn = true;
 
-let me;
-const cells = [];
-
-for (let i = 0; i < 9; i++) {
-  const cell = document.createElement('div');
-  cell.className = 'cell';
-  cell.dataset.index = i;
-  boardEl.appendChild(cell);
-  cell.addEventListener('click', () => {
-    socket.emit('placeMarker', i);
-  });
-  cells.push(cell);
+function createRoom() {
+  const roomId = document.getElementById("roomInput").value;
+  socket.emit("createRoom", roomId);
 }
 
-socket.on('connected', id => {
-  me = id;
-  status.textContent = 'Game ready! Place markers!';
+socket.on("roomJoined", (roomId) => {
+  currentRoom = roomId;
+  document.getElementById("status").innerText = "Joined room: " + roomId;
+  drawBoard();
 });
 
-socket.on('boardUpdate', board => {
-  cells.forEach(c => c.innerHTML = '');
-  board.forEach(m => {
-    const mk = document.createElement('div');
-    mk.className = 'marker';
-    mk.textContent = m.player === me ? 'X' : 'O';
-    cells[m.index].appendChild(mk);
-  });
+socket.on("roomFull", () => {
+  document.getElementById("status").innerText = "Room is full!";
 });
 
-socket.on('gameOver', winner => {
-  status.textContent = winner === me ? 'You win!' : 'You lose.';
-  confirmOverlay.classList.remove('hidden');
+socket.on("updatePlayers", (players) => {
+  mySymbol = players.indexOf(socket.id) === 0 ? "X" : "O";
+  isMyTurn = mySymbol === "X";
+  document.getElementById("status").innerText = `You are "${mySymbol}"`;
 });
 
-socket.on('newGame', () => {
-  status.textContent = 'New Game! Place markers!';
-  confirmOverlay.classList.add('hidden');
+socket.on("opponentMove", ({ index, symbol }) => {
+  document.querySelectorAll(".cell")[index].innerText = symbol;
+  isMyTurn = true;
 });
 
-playBtn.addEventListener('click', () => {
-  socket.emit('restartConfirm');
-  confirmOverlay.classList.add('hidden');
-  status.textContent = 'Waiting for opponent...';
-});
+function drawBoard() {
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.onclick = () => {
+      if (!cell.innerText && isMyTurn && currentRoom) {
+        cell.innerText = mySymbol;
+        socket.emit("makeMove", {
+          roomId: currentRoom,
+          index: i,
+          symbol: mySymbol
+        });
+        isMyTurn = false;
+      }
+    };
+    board.appendChild(cell);
+  }
+}
