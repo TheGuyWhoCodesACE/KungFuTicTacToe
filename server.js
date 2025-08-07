@@ -1,46 +1,46 @@
-const express = require("express");
-const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http);
-const PORT = process.env.PORT || 3000;
+let playersReady = 0;
 
-app.use(express.static("public"));
+io.on('connection', (socket) => {
+  // ... your existing code ...
 
-let board = [];
-let cooldowns = {};
-
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  socket.on("placeMarker", (data) => {
-    const now = Date.now();
-    if (!cooldowns[socket.id]) cooldowns[socket.id] = { placed: 0, until: 0 };
-
-    let state = cooldowns[socket.id];
-    if (now < state.until) return;
-
-    if (state.placed < 1) {
-      state.placed++;
-    } else {
-      state.placed = 0;
-      state.until = now + 1000;
+  socket.on('move', (data) => {
+    // Assume `data.board` is a 2D array (3x3)
+    const winner = checkWinner(data.board);
+    if (winner) {
+      io.emit('gameOver', { winner });
     }
-
-    board.push({ x: data.x, y: data.y, playerId: socket.id, time: now });
-    io.emit("updateBoard", board);
   });
 
-  socket.on("disconnect", () => {
-    delete cooldowns[socket.id];
+  socket.on('restartConfirm', () => {
+    playersReady++;
+    if (playersReady === 2) {
+      io.emit('restartGame');
+      playersReady = 0;
+    }
   });
 });
 
-setInterval(() => {
-  const now = Date.now();
-  board = board.filter(marker => now - marker.time < 2000);
-  io.emit("updateBoard", board);
-}, 100);
+// Win detection logic
+function checkWinner(board) {
+  const lines = [
+    // rows
+    [board[0][0], board[0][1], board[0][2]],
+    [board[1][0], board[1][1], board[1][2]],
+    [board[2][0], board[2][1], board[2][2]],
+    // columns
+    [board[0][0], board[1][0], board[2][0]],
+    [board[0][1], board[1][1], board[2][1]],
+    [board[0][2], board[1][2], board[2][2]],
+    // diagonals
+    [board[0][0], board[1][1], board[2][2]],
+    [board[0][2], board[1][1], board[2][0]]
+  ];
 
-http.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  for (const line of lines) {
+    if (line[0] && line[0] === line[1] && line[1] === line[2]) {
+      return line[0]; // 'X' or 'O'
+    }
+  }
+
+  return null;
+}
