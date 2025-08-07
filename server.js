@@ -8,81 +8,83 @@ const io = socketIo(server);
 
 app.use(express.static('public'));
 
-let players = [];
-let board = Array(9).fill(null);
-let currentPlayer = 'X';
-let confirmations = 0;
-
-const winningCombos = [
-  [0, 1, 2], [3, 4, 5], [6, 7, 8],
-  [0, 3, 6], [1, 4, 7], [2, 5, 8],
-  [0, 4, 8], [2, 4, 6]
-];
+let board = []; // active markers: { index, player, time }
+let cooldowns = {};
+let confirmations = {};
 
 io.on('connection', socket => {
-  if (players.length < 2) {
-    players.push(socket);
-    const symbol = players.length === 1 ? 'X' : 'O';
-    socket.emit('assignSymbol', symbol);
-    if (players.length === 2) {
-      players.forEach(p => p.emit('startGame'));
-    }
-  } else {
-    socket.emit('roomFull');
-    return;
-  }
+  const player = socket.id;
+  cooldowns[player] = { placed: 0, until: 0 };
+  confirmations[player] = false;
 
-  socket.on('makeMove', index => {
-    if (board[index] || players.length < 2) return;
+  socket.emit('connected', player);
 
-    const playerIndex = players.indexOf(socket);
-    const symbol = playerIndex === 0 ? 'X' : 'O';
-    if (symbol !== currentPlayer) return;
+  socket.on('placeMarker', idx => {
+    const now = Date.now();
+    const cd = cooldowns[player];
+    if (now < cd.until || cd.placed >= 2) return;
 
-    board[index] = symbol;
-    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    board.push({ index: idx, player, time: now });
+    cd.placed++;
+    if (cd.placed === 2) cd.until = now + 1000;
 
-    players.forEach(p => p.emit('updateBoard', board));
+    io.emit('boardUpdate', board);
 
-    const winner = checkWin();
-    if (winner) {
-      players.forEach(p => p.emit('gameOver', winner));
-    } else if (!board.includes(null)) {
-      players.forEach(p => p.emit('gameOver', 'draw'));
-    }
+    checkWinCondition();
   });
 
-  socket.on('confirmReset', () => {
-    confirmations++;
-    if (confirmations === 2) {
-      board = Array(9).fill(null);
-      currentPlayer = 'X';
-      confirmations = 0;
-      players.forEach(p => {
-        p.emit('updateBoard', board);
-        p.emit('startGame');
-      });
-    }
+  socket.on('restartConfirm', () => {
+    confirmations[player] = true;
+    if (Object.values(confirmations).every(v => v)) startNewGame();
   });
 
   socket.on('disconnect', () => {
-    players = players.filter(p => p !== socket);
-    board = Array(9).fill(null);
-    currentPlayer = 'X';
-    confirmations = 0;
-    players.forEach(p => p.emit('opponentLeft'));
+    delete cooldowns[player];
+    delete confirmations[player];
   });
 });
 
-function checkWin() {
-  for (const combo of winningCombos) {
-    const [a, b, c] = combo;
-    if (board[a] && board[a] === board[b] && board[b] === board[c]) {
-      return board[a]; // 'X' or 'O'
+setInterval(() => {
+  const now = Date.now();
+  board = board.filter(m => now - m.time < 2000);
+  io.emit('boardUpdate', board);
+
+  // Reset placed count if cooldown expired
+  Object.entries(cooldowns).forEach(([p, cd]) => {
+    if (now >= cd.until) cd.placed = 0;
+  });
+}, 100);
+
+function checkWinCondition() {
+  const playersLatest = {};
+  board.forEach(m => {
+    playersLatest[m.player] = playersLatest[m.player] || [];
+    playersLatest[m.player].push(m.index);
+  });
+
+  Object.entries(playersLatest).forEach(([p, positions]) => {
+    if (hasThreeInARow(positions)) {
+      io.emit('gameOver', p);
     }
-  }
-  return null;
+  });
+}
+
+const combos = [
+  [0,1,2], [3,4,5], [6,7,8],
+  [0,3,6], [1,4,7], [2,5,8],
+  [0,4,8], [2,4,6],
+];
+
+function hasThreeInARow(pos) {
+  return combos.some(c => c.every(i => pos.includes(i)));
+}
+
+function startNewGame() {
+  board = [];
+  Object.keys(confirmations).forEach(p => confirmations[p] = false);
+  io.emit('boardUpdate', board);
+  io.emit('newGame');
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
