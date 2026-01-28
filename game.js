@@ -6,9 +6,10 @@ const status = document.getElementById("status");
 const boardDiv = document.getElementById("board");
 
 const roomRef = db.ref("rooms/" + roomId);
+
 let lastPlaceTime = 0;
 
-// Build board
+// Build 3x3 board
 for (let i = 0; i < 9; i++) {
     const cell = document.createElement("div");
     cell.className = "cell";
@@ -16,17 +17,21 @@ for (let i = 0; i < 9; i++) {
     boardDiv.appendChild(cell);
 }
 
-// Initialize room
+// Initialize room in database
 roomRef.transaction(data => {
-    if (data === null) {
-        return { board: Array(9).fill(null), players: [username], winner: null };
-    } else if (!data.players.includes(username)) {
+    if (!data) {
+        return {
+            board: Array(9).fill(null),
+            players: [username],
+            winner: null
+        };
+    } else if (!data.players.includes(username) && data.players.length < 2) {
         data.players.push(username);
     }
     return data;
 });
 
-// Listen for updates
+// Listen for live updates
 roomRef.on("value", snap => {
     const data = snap.val();
     if (!data) return;
@@ -44,8 +49,9 @@ roomRef.on("value", snap => {
     }
 });
 
+// Handle placing tiles
 function placeTile(index) {
-    if (Date.now() - lastPlaceTime < 200) return; // cooldown 0.2s
+    if (Date.now() - lastPlaceTime < 200) return; // 0.2s cooldown
     lastPlaceTime = Date.now();
 
     roomRef.transaction(data => {
@@ -64,33 +70,35 @@ function placeTile(index) {
         return data;
     });
 
-    // remove tile after 2s
+    // Remove tile after 2 seconds
     setTimeout(() => {
         roomRef.transaction(data => {
             if (!data) return data;
             const t = data.board[index];
-            if (t && Date.now() - t.time >= 2000) data.board[index] = null;
+            if (t && Date.now() - t.time >= 2000) {
+                data.board[index] = null;
+            }
             return data;
         });
     }, 2000);
 }
 
+// Update board visually
 function updateBoard(board) {
     board.forEach((tile, i) => {
         const cell = boardDiv.children[i];
         if (!tile) {
             cell.textContent = "";
-            cell.classList.remove("fade");
             cell.style.opacity = 1;
         } else {
-            cell.textContent = "X"; // show generic tile
-            cell.classList.add("fade");
+            cell.textContent = "●"; // generic tile
             const age = Date.now() - tile.time;
             cell.style.opacity = Math.max(0, 1 - age / 2000);
         }
     });
 }
 
+// Check if player has 3 live tiles in a row
 function checkWin(board, player) {
     const live = i => board[i] && board[i].symbol === player && Date.now() - board[i].time < 2000;
     const lines = [
