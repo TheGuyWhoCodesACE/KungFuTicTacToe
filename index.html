@@ -1,36 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
   <title>KungFu Tic Tac Toe</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 60px;
-    }
-    input, button {
-      padding: 10px;
-      margin: 6px;
-      font-size: 16px;
-    }
+    body { font-family: Arial; text-align: center; margin-top: 60px; }
+    input, button { padding: 10px; margin: 6px; font-size: 16px; }
   </style>
 </head>
 <body>
 
-  <h1>🥋 KungFu Tic Tac Toe</h1>
+<h1>🥋 KungFu Tic Tac Toe</h1>
 
-  <input id="username" placeholder="Username">
-  <br>
+<input id="username" placeholder="Username"><br>
+<button onclick="createRoom()">Create Room</button><br><br>
 
-  <button onclick="createRoom()">Create Room</button>
-  <br><br>
+<input id="roomId" placeholder="Room ID"><br>
+<button onclick="joinRoom()">Join Room</button>
 
-  <input id="roomId" placeholder="Room ID">
-  <br>
-  <button onclick="joinRoom()">Join Room</button>
-
-  <script src="index.js"></script>
+<script src="index.js"></script>
 </body>
 </html>
