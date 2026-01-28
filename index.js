@@ -1,25 +1,31 @@
 function createRoom() {
-  const username = document.getElementById("username").value.trim();
-  if (!username) return alert("Enter a username");
-
-  const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const username = usernameInput();
+  const roomId = randomRoom();
 
   localStorage.setItem("username", username);
   localStorage.setItem("roomId", roomId);
-  localStorage.setItem("isHost", "true");
+  localStorage.setItem("role", "X");
 
-  window.location.href = "game.html";
+  location.href = "game.html";
 }
 
 function joinRoom() {
-  const username = document.getElementById("username").value.trim();
+  const username = usernameInput();
   const roomId = document.getElementById("roomId").value.trim().toUpperCase();
-
-  if (!username || !roomId) return alert("Enter username and room ID");
 
   localStorage.setItem("username", username);
   localStorage.setItem("roomId", roomId);
-  localStorage.setItem("isHost", "false");
+  localStorage.setItem("role", "O");
 
-  window.location.href = "game.html";
+  location.href = "game.html";
+}
+
+function usernameInput() {
+  const u = document.getElementById("username").value.trim();
+  if (!u) alert("Enter username");
+  return u;
+}
+
+function randomRoom() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
