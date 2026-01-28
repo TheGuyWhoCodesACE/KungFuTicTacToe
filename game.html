@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <title>KungFu Tic Tac Toe</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 40px;
     }
+
     #board {
       display: grid;
       grid-template-columns: repeat(3, 100px);
@@ -17,6 +19,7 @@
       justify-content: center;
       margin: 20px auto;
     }
+
     .cell {
       width: 100px;
       height: 100px;
@@ -27,13 +30,18 @@
       justify-content: center;
       cursor: pointer;
     }
+
+    .fade {
+      opacity: 0;
+      transition: opacity 2s linear;
+    }
   </style>
 </head>
 <body>
 
   <h1>🥋 KungFu Tic Tac Toe</h1>
   <p>Room: <b id="roomDisplay"></b></p>
-  <p id="status">Waiting for players...</p>
+  <p id="status">Kung-Fu Mode: No Turns</p>
 
   <div id="board"></div>
 
