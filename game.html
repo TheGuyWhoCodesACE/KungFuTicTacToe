@@ -1,1 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KungFu Tic Tac Toe</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    #board { display: grid; grid-template-columns: repeat(3, 100px); grid-gap: 5px; margin: 0 auto; }
+    .cell { width: 100px; height: 100px; border: 1px solid black; font-size: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>KungFu Tic Tac Toe</h1>
+  <p>Room ID: <span id="roomDisplay"></span></p>
+  <div id="board"></div>
+  <p id="status"></p>
 
+  <script src="game.js"></script>
+</body>
+</html>
