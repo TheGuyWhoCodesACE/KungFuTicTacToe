@@ -1,96 +1,98 @@
-const username = localStorage.getItem("username");
 const roomId = localStorage.getItem("roomId");
-const isHost = localStorage.getItem("isHost") === "true";
+const role = localStorage.getItem("role");
 
-document.getElementById("roomDisplay").innerText = roomId;
+document.getElementById("room").innerText = roomId;
 
 const roomRef = db.ref("rooms/" + roomId);
 const boardDiv = document.getElementById("board");
+const status = document.getElementById("status");
 
-const symbol = isHost ? "X" : "O";
-let lastPlaceTime = 0;
+let lastAction = 0;
+let gameOver = false;
 
-// Build board
 for (let i = 0; i < 9; i++) {
-  const cell = document.createElement("div");
-  cell.className = "cell";
-  cell.onclick = () => attemptPlace(i);
-  boardDiv.appendChild(cell);
+  const c = document.createElement("div");
+  c.className = "cell";
+  c.onclick = () => place(i);
+  boardDiv.appendChild(c);
 }
 
-// Initialize room
-roomRef.once("value", snap => {
-  if (!snap.exists()) {
+roomRef.once("value", s => {
+  if (!s.exists()) {
     roomRef.set({
       board: Array(9).fill(null),
-      timestamps: Array(9).fill(0)
+      winner: null
     });
   }
 });
 
-// Listen for updates
 roomRef.on("value", snap => {
   const data = snap.val();
   if (!data) return;
 
-  data.board.forEach((value, i) => {
-    const cell = boardDiv.children[i];
+  render(data.board);
 
-    if (value) {
-      cell.innerText = value.symbol;
-      cell.classList.add("fade");
-
-      const elapsed = Date.now() - value.time;
-      if (elapsed < 2000) {
-        cell.style.opacity = 1 - elapsed / 2000;
-      } else {
-        cell.innerText = "";
-        cell.classList.remove("fade");
-        cell.style.opacity = 1;
-      }
-    } else {
-      cell.innerText = "";
-      cell.classList.remove("fade");
-      cell.style.opacity = 1;
-    }
-  });
+  if (data.winner) {
+    status.innerText = `${data.winner} WINS`;
+    gameOver = true;
+  }
 });
 
-// Attempt to place tile
-function attemptPlace(index) {
+function place(i) {
+  if (gameOver) return;
   const now = Date.now();
+  if (now - lastAction < 200) return;
+  lastAction = now;
 
-  // Cooldown: 0.2 seconds
-  if (now - lastPlaceTime < 200) return;
-  lastPlaceTime = now;
+  roomRef.transaction(data => {
+    if (!data || data.winner) return data;
 
-  roomRef.once("value", snap => {
-    const data = snap.val();
-    if (!data) return;
+    const tile = data.board[i];
+    if (tile && now - tile.time < 2000) return data;
 
-    // If tile still exists and hasn't expired, block
-    const tile = data.board[index];
-    if (tile && now - tile.time < 2000) return;
+    data.board[i] = { symbol: role, time: now };
 
-    // Place tile
-    data.board[index] = {
-      symbol: symbol,
-      time: now
-    };
+    if (checkWin(data.board, role, now)) {
+      data.winner = role;
+    }
 
-    roomRef.update({ board: data.board });
-
-    // Remove tile after 2 seconds
-    setTimeout(() => {
-      roomRef.once("value", s => {
-        const d = s.val();
-        if (!d) return;
-
-        if (d.board[index] && d.board[index].time === now) {
-          d.board[index] = null;
-          roomRef.update({ board: d.board });
-        }
-      });
-    }, 2000);
+    return data;
   });
+
+  setTimeout(() => cleanup(i), 2000);
+}
+
+function cleanup(i) {
+  roomRef.transaction(data => {
+    if (!data) return data;
+    const t = data.board[i];
+    if (t && Date.now() - t.time >= 2000) {
+      data.board[i] = null;
+    }
+    return data;
+  });
+}
+
+function render(board) {
+  board.forEach((t, i) => {
+    const cell = boardDiv.children[i];
+    if (!t) {
+      cell.innerText = "";
+      cell.style.opacity = 1;
+    } else {
+      cell.innerText = t.symbol;
+      const age = Date.now() - t.time;
+      cell.style.opacity = Math.max(0, 1 - age / 2000);
+    }
+  });
+}
+
+function checkWin(board, sym, now) {
+  const live = i => board[i] && board[i].symbol === sym && now - board[i].time < 2000;
+  const lines = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+  return lines.some(l => l.every(live));
 }
